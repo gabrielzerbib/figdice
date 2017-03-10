@@ -56,7 +56,7 @@ class LexerTest extends PHPUnit_Framework_TestCase {
 
     // Make sure that the passed expression is successfully parsed,
     // before asserting stuff on its evaluation.
-    $parseResult = $lexer->parse($context);
+    $parseResult = $lexer->parse();
     $this->assertTrue($parseResult, 'parsed expression: ' . $lexer->getExpression());
 
     // Mock the mounting of root data universe into the view
@@ -83,7 +83,7 @@ class LexerTest extends PHPUnit_Framework_TestCase {
   }
 
   /**
-   * @expectedException \figdice\exceptions\LexerUnexpectedCharException
+   * @expectedException \figdice\exceptions\LexerSyntaxErrorException
    */
   public function testParseErrorThrowsException()
   {
@@ -361,7 +361,7 @@ class LexerTest extends PHPUnit_Framework_TestCase {
   }
 
   /**
-   * @expectedException \figdice\exceptions\LexerUnexpectedCharException
+   * @expectedException \figdice\exceptions\LexerUnbalancedParenthesesException
    */
   public function testOpeningParenForFuncAndEOI()
   {

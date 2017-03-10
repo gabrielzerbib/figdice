@@ -1,43 +1,17 @@
 <?php
 /**
  * @author Gabriel Zerbib <gabriel@figdice.org>
- * @copyright 2004-2016, Gabriel Zerbib.
- * @version 2.3.4
  * @package FigDice
- *
- * This file is part of FigDice.
- *
- * FigDice is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * FigDice is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with FigDice.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 namespace figdice\classes\lexer;
 
 use figdice\classes\Context;
-use \figdice\classes\ViewElementTag;
 use \figdice\exceptions\LexerUnexpectedCharException;
 use \figdice\exceptions\LexerSyntaxErrorException;
 use \figdice\exceptions\LexerUnbalancedParenthesesException;
 
 class Lexer {
-
-    /** @var Context */
-    private $context;
-
-	/**
-	 * @var ViewElementTag
-	 */
-	private $viewElement;
 
 	/**
 	 * @var string
@@ -143,14 +117,13 @@ class Lexer {
 		return $this->stackRP[0];
 	}
 
-	/**
-	 * @param Context $context
-	 * @return boolean
-	 */
-	public function parse(Context $context) {
-	    $this->context = $context;
-		$this->viewElement = $context->tag;
-
+    /**
+     * @return bool
+     * @throws LexerSyntaxErrorException
+     * @throws LexerUnbalancedParenthesesException
+     * @throws LexerUnexpectedCharException
+     */
+	public function parse() {
 		//Interpret an empty expression as boolean false.
 		if(trim($this->expression) == '') {
 		  $this->pushOperand(new TokenLiteral(false));
@@ -174,8 +147,7 @@ class Lexer {
 				if($nbOperands) {
 					// Check that we have enough operands on the stack.
 					if (sizeof($this->stackRP) < $nbOperands) {
-						$message = $this->getViewFile() . '(' . $this->getViewLine() . '): Missing operand in expression: ' . $this->expression;
-						throw new LexerSyntaxErrorException('', $this->getViewFile(), $this->getViewLine());
+						throw new LexerSyntaxErrorException('Missing operand', $this->expression);
 					}
 					$operator->setOperands(array_splice($this->stackRP, sizeof($this->stackRP) - $nbOperands, $nbOperands));
 				}
@@ -184,10 +156,14 @@ class Lexer {
 					array_pop($this->stackFunctions);
 			}
 		}
-		catch (Exception $exception) {
-			$errorMsg = "Unexpected character: $char at position: {$this->parsingPosition} in expression: {$this->expression}.";
-			$message = $this->getViewFile() . '(' . $this->getViewLine() . '): ' . $errorMsg ;
-			throw new LexerUnexpectedCharException($errorMsg, $this->getViewFile(), $this->getViewLine());
+		catch (LexerSyntaxErrorException $ex) {
+		    throw $ex;
+        }
+        catch (LexerUnbalancedParenthesesException $ex) {
+		    throw $ex;
+        }
+		catch (\Exception $exception) {
+			throw new LexerUnexpectedCharException($char, $this->parsingPosition, $this->expression);
 		}
 
 		if( (count($this->stackOperators) > 0) ||
@@ -195,10 +171,7 @@ class Lexer {
 				(count($this->stackRP) != 1)
 			)
 		{
-			$message = $this->getViewFile() . '(' . $this->getViewLine() . '): Syntax error in expression: ' . $this->expression;
-			throw new LexerSyntaxErrorException($message,
-					$this->getViewFile(),
-					$this->getViewLine());
+			throw new LexerSyntaxErrorException('Syntax error', $this->expression);
 		}
 
 		// Check for unbalanced parentheses:
@@ -206,10 +179,7 @@ class Lexer {
 		    (! $this->stackRP[0]->isClosed())
 		)
 		{
-		  $message = $this->getViewFile() . '(' . $this->getViewLine() . '): Unbalanced parentheses in expression: ' . $this->expression;
-		  throw new LexerUnbalancedParenthesesException($message,
-		    $this->getViewFile(),
-		    $this->getViewLine());
+		  throw new LexerUnbalancedParenthesesException($this->expression);
 		}
 
 		return true;
@@ -227,7 +197,7 @@ class Lexer {
 		$this->currentState = self::$stateDot;
 	}
 	/**
-	 * @param char $char
+	 * @param string $char
 	 */
 	public function setStateInteger($char)
 	{
@@ -280,9 +250,12 @@ class Lexer {
 	public function pushOperand($tokenOperand) {
 		$this->stackRP[] = $tokenOperand;
 	}
-	/**
-	 * @param TokenOperator $tokenOperator
-	 */
+
+    /**
+     * @param TokenOperator $tokenOperator
+     *
+     * @throws LexerSyntaxErrorException
+     */
 	public function pushOperator($tokenOperator) {
 		//If priority of the new operator
 		//is lower than or equal to that of the previous, if any,
@@ -307,25 +280,24 @@ class Lexer {
 					array_pop($this->stackOperators);
 
 					$nbOperands = $operator->getNumOperands();
-					if($nbOperands) {
-            // Check that we have enough operands on the stack.
-            if (sizeof($this->stackRP) < $nbOperands) {
-              $message = $this->getViewFile() . '(' . $this->getViewLine() . '): Missing operand in expression: ' . $this->expression;
-              throw new LexerSyntaxErrorException('', $this->getViewFile(), $this->getViewLine());
-            }
-						$operator->setOperands(array_splice($this->stackRP, sizeof($this->stackRP) - $nbOperands, $nbOperands));
-					}
-					$this->stackRP[] = $operator;
+                    if($nbOperands) {
+                        // Check that we have enough operands on the stack.
+                        if (sizeof($this->stackRP) < $nbOperands) {
+                            throw new LexerSyntaxErrorException('Missing operand', $this->expression);
+                        }
+                        $operator->setOperands(array_splice($this->stackRP, sizeof($this->stackRP) - $nbOperands, $nbOperands));
+                    }
+                    $this->stackRP[] = $operator;
 
-					if($operator instanceof TokenFunction) {
-						array_pop($this->stackFunctions);
-						break;
-					}
-				}
-				else {
-					break;
-				}
-			}
+                    if($operator instanceof TokenFunction) {
+                        array_pop($this->stackFunctions);
+                        break;
+                    }
+                }
+                else {
+                    break;
+                }
+            }
 		}
 
 		$this->stackOperators[] = $tokenOperator;
@@ -345,7 +317,7 @@ class Lexer {
 			$nbOperands = $operator->getNumOperands();
 			if($nbOperands) {
 				if (count($this->stackRP) < $nbOperands) {
-					throw new LexerSyntaxErrorException('Not enough arguments in: ' . $this->getExpression(), $this->getViewFile(), $this->getViewLine());
+					throw new LexerSyntaxErrorException('Not enough arguments', $this->expression);
 				}
 				$operator->setOperands(array_splice($this->stackRP, sizeof($this->stackRP) - $nbOperands, $nbOperands));
 			}
@@ -364,7 +336,6 @@ class Lexer {
 	/**
 	 * Create a wrappable Expression out of what's inside the [],
 	 * and append it as a path element to current path.
-	 * @throws Exception
 	 */
 	public function closeSquareBracket() {
 		while(0 < count($this->stackOperators)) {
@@ -413,10 +384,7 @@ class Lexer {
 		 
 		if ( ($funcStackCount = count($this->stackFunctions)) == 0) {
 			// There isn't a function to which we're incrementing arity!
-			$errorMsg = $this->getViewFile() . '(' . $this->getViewLine() . '): Unbalanced parentheses in expression: "' . $this->expression . '"';
-			throw new LexerUnbalancedParenthesesException($errorMsg,
-				$this->getViewFile(),
-				$this->getViewLine());
+			throw new LexerUnbalancedParenthesesException($this->expression);
 		}
 
     // Grab the topmost function on the stack. That's the one we're dealing with.
@@ -449,8 +417,6 @@ class Lexer {
 	 * @return mixed
 	 */
 	public function evaluate(Context $context) {
-	    $this->context = $context;
-		$this->viewElement = $context->tag;
 		return $this->stackRP[0]->evaluate($context);
 	}
 
@@ -461,16 +427,11 @@ class Lexer {
 		return $this->expression;
 	}
 
-	/**
-	 * Returns the file containing the current
-	 * expression to evaluate.
-	 *
-	 * @return string
-	 */
-	public function getViewFile() {
-		return $this->context->getFilename();
-	}
-	public function getViewLine() {
-		return $this->viewElement->getLineNumber();
-	}
+    /**
+     * @return int
+     */
+    public function getPosition()
+    {
+        return $this->parsingPosition;
+    }
 }

@@ -19,10 +19,10 @@ use figdice\classes\TagFigInclude;
 use figdice\classes\TagFigMount;
 use figdice\classes\TagFigParam;
 use figdice\classes\TagFigTrans;
-use figdice\classes\ViewElement;
 use figdice\classes\ViewElementContainer;
 use figdice\classes\ViewElementTag;
 use figdice\exceptions\FeedClassNotFoundException;
+use figdice\exceptions\FigException;
 use figdice\exceptions\FileNotFoundException;
 use figdice\exceptions\RequiredAttributeException;
 use figdice\exceptions\TagRenderingException;
@@ -484,6 +484,9 @@ class View implements \Serializable {
             throw new RenderingException($ex->getTag(), $context->getFilename(), $ex->getLine(), $ex->getMessage(), $ex);
         } catch (FeedClassNotFoundException $ex) {
             throw $ex->setFile($context->getFilename());
+        } catch (FigException $exception) {
+            $exception->setTagFileLine($context->tag->getTagName(), $context->getFilename(), $context->tag->getLineNumber());
+            throw $exception;
         }
 
 

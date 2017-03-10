@@ -1,28 +1,12 @@
 <?php
 /**
  * @author Gabriel Zerbib <gabriel@figdice.org>
- * @copyright 2004-2015, Gabriel Zerbib.
- * @version 2.1.1
  * @package FigDice
- *
- * This file is part of FigDice.
- *
- * FigDice is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * FigDice is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with FigDice.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 namespace figdice\classes\lexer;
 
+use figdice\exceptions\LexerSyntaxErrorException;
 use \figdice\exceptions\LexerUnexpectedCharException;
 
 abstract class DFAState {
@@ -107,18 +91,16 @@ abstract class DFAState {
 	 * @throws LexerUnexpectedCharException
 	 */
 	protected function throwError($lexer, $char) {
-		$message = 'Unexpected char: ' . $char;
-		$message = get_class($this) . ': file: ' . $lexer->getViewFile() . '(' . $lexer->getViewLine() . '): ' . $message . ' in expression: ' . $lexer->getExpression();
-		throw new LexerUnexpectedCharException($message, $lexer->getViewFile(), $lexer->getViewLine());
+		throw new LexerUnexpectedCharException($char, $lexer->getPosition(), $lexer->getExpression());
 	}
 
     /**
      * @param Lexer $lexer
      * @param string $message
-     * @throws LexerUnexpectedCharException
+     *
+     * @throws LexerSyntaxErrorException
      */
 	protected function throwErrorWithMessage($lexer, $message) {
-		$message = get_class($this) . ': file: ' . $lexer->getViewFile() . '(' . $lexer->getViewLine() . '): ' . $message . ' in expression: ' . $lexer->getExpression();
-		throw new LexerUnexpectedCharException($message, $lexer->getViewFile(), $lexer->getViewLine());
+		throw new LexerSyntaxErrorException($message, $lexer->getExpression());
 	}
 }
